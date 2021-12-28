@@ -1,19 +1,40 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract Exchange {
+contract Exchange is ERC20 {
     address public tokenAddress;
 
-    constructor(address _token) {
+    constructor(address _token) ERC20("LP Token", "LP") {
         require(_token != address(0), "Invalid Token");
         tokenAddress = _token;
     }
 
-    function addLiquidity(uint256 _tokenAmount) public payable {
+    function addLiquidity(uint256 _tokenAmount)
+        public
+        payable
+        returns (uint256)
+    {
+        uint256 mintedTokens;
+
+        if (totalSupply() == 0) {
+            mintedTokens = address(this).balance;
+        } else {
+            uint256 ethReserve = address(this).balance - msg.value;
+            uint256 tokenReserve = getReserve();
+            uint256 correctTokenAmount = (msg.value * tokenReserve) /
+                ethReserve;
+            require(_tokenAmount >= correctTokenAmount, "invalid ratio");
+            mintedTokens = (totalSupply() * msg.value) / ethReserve;
+        }
+
         IERC20 token = IERC20(tokenAddress);
         token.transferFrom(msg.sender, address(this), _tokenAmount);
+
+        _mint(msg.sender, mintedTokens);
+        return mintedTokens;
     }
 
     function getReserve() public view returns (uint256) {
@@ -73,7 +94,7 @@ contract Exchange {
         );
 
         require(ethBought >= _minEth, "minumun amount not reach");
-        
+
         IERC20(tokenAddress).transferFrom(
             msg.sender,
             address(this),
