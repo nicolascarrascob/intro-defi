@@ -3,13 +3,16 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./Registry.sol";
 
 contract Exchange is ERC20 {
     address public tokenAddress;
+    address public registryAddress;
 
     constructor(address _token) ERC20("LP Token", "LP") {
         require(_token != address(0), "Invalid Token");
         tokenAddress = _token;
+        registryAddress = msg.sender;
     }
 
     function addLiquidity(uint256 _tokenAmount)
@@ -46,7 +49,7 @@ contract Exchange is ERC20 {
         uint256 tokenAmount = (getReserve() * _amount) / totalSupply();
 
         _burn(msg.sender, _amount);
-        
+
         payable(msg.sender).transfer(ethAmount);
         IERC20(tokenAddress).transfer(msg.sender, tokenAmount);
 
@@ -93,7 +96,7 @@ contract Exchange is ERC20 {
         return getAmount(_tokenSold, tokenReserve, address(this).balance);
     }
 
-    function ethToTokenSwap(uint256 _minTokens) public payable {
+    function ethToToken(uint256 _minTokens, address _recipient) private {
         uint256 tokenReserve = getReserve();
 
         uint256 tokensBought = getAmount(
@@ -103,7 +106,18 @@ contract Exchange is ERC20 {
         );
 
         require(tokensBought >= _minTokens, "minimun amout not reach");
-        IERC20(tokenAddress).transfer(msg.sender, tokensBought);
+        IERC20(tokenAddress).transfer(_recipient, tokensBought);
+    }
+
+    function ethToTokenSwap(uint256 _minTokens) public payable {
+        ethToToken(_minTokens, msg.sender);
+    }
+
+    function ethToTokenTransfer(uint256 _minTokens, address _recipient)
+        public
+        payable
+    {
+        ethToToken(_minTokens, _recipient);
     }
 
     function tokenToEthSwap(uint256 _tokenSold, uint256 _minEth) public {
@@ -123,5 +137,32 @@ contract Exchange is ERC20 {
             _tokenSold
         );
         payable(msg.sender).transfer(ethBought);
+    }
+
+    function tokenToTokenSwap(
+        uint256 _tokenSold,
+        uint256 _minTokenBought,
+        address _tokenAddress
+    ) public {
+        address exchangeAddress = Registry(registryAddress).getExchange(
+            _tokenAddress
+        );
+
+        require(exchangeAddress != address(0), "no registry for token");
+        require(exchangeAddress != address(this), "invalid exchange address");
+
+        uint256 tokenReserve = getReserve();
+        uint256 ethBought = getAmount(
+            _tokenSold,
+            tokenReserve,
+            address(this).balance
+        );
+
+        ERC20(tokenAddress).transferFrom(msg.sender, address(this), _tokenSold);
+
+        Exchange(exchangeAddress).ethToTokenTransfer{value: ethBought}(
+            _minTokenBought,
+            msg.sender
+        );
     }
 }
