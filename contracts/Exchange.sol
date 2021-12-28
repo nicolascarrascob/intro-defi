@@ -52,9 +52,16 @@ contract Exchange is ERC20 {
         // Y = outputReserve
         // (x + dx) * (y - dy) = K
         // dy = y - dx ..........
-        uint256 outputAmount = (inputAmount * outputReserve) /
-            (inputReserve + inputAmount);
-        return (outputAmount);
+        //uint256 outputAmount = (inputAmount * outputReserve) /
+        //    (inputReserve + inputAmount);
+        //return (outputAmount);
+        uint256 fee = 99;
+        uint256 inputAmountWithFee = inputAmount * fee;
+        uint256 numerator = inputAmountWithFee * outputReserve;
+        uint256 denominator = (inputReserve * 100) + inputAmountWithFee;
+
+        return numerator / denominator;
+
     }
 
     function getTokenAmount(uint256 _ethSold) public view returns (uint256) {
