@@ -45,11 +45,12 @@ contract Exchange is ERC20 {
         uint256 ethAmount = (address(this).balance * _amount) / totalSupply();
         uint256 tokenAmount = (getReserve() * _amount) / totalSupply();
 
+        _burn(msg.sender, _amount);
         
-        address(msg.sender).send(ethAmount);
+        payable(msg.sender).transfer(ethAmount);
+        IERC20(tokenAddress).transfer(msg.sender, tokenAmount);
 
-        IERC20 token = IERC20(tokenAddress);
-        token.transfer(msg.sender, tokenAmount);
+        return (ethAmount, tokenAmount);
     }
 
     function getReserve() public view returns (uint256) {
